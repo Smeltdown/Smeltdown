@@ -13,6 +13,7 @@
 - From the main menu the player presses `Start`, which starts a new playthrough with a random seed. The seed stays the same for the whole playthrough.
 - Nine levels over three fixed difficulties, three levels each.
 - **Structure:** one tutorial level, generated from a fixed seed, before the nine levels.
+- **Level progression:** a level must be won before the next one unlocks; no skipping ahead.
 - Only one playthrough exists at a time. Its progress is saved, so the player can close the game and resume later. Starting a new playthrough replaces the current one.
 
 ## Map
@@ -23,16 +24,17 @@
 - Levels contain only the ores their target needs.
 - **Patch count** is up to the generator.
 - Fixed delivery point on the map, placed by the generator, fed directly by belts.
+- **Wrong items:** the delivery point accepts any item; only target items count towards the rate. Wrong items carry no penalty for now (see "Scope increasers").
 
 ## Buildings
 
 - **Two core machine types: miners and assemblers.**
 - **Miners:** placed on resource patches; output rate depends on how many ore tiles the miner covers.
 - **Assemblers:**
-  - Non-square shapes (L, T, S/Z and similar, like Tetris pieces), rotatable.
+  - Non-square shapes (L, T, S/Z and similar, like Tetris pieces), rotatable. No mirroring.
   - The player gets shapes from one fixed sequence of 20, the same in every level. Each next assembler placed is the next shape in the sequence.
   - One recipe per assembler, chosen by the player.
-  - **Buffers:** one capped input buffer per ingredient and one capped output buffer. A machine stops crafting while its output buffer is full.
+  - **Buffers:** one input buffer per ingredient and one output buffer, as in Factorio. Each input buffer holds up to 2× that ingredient's recipe amount, the output buffer up to 2× the recipe's output amount (both enough for two crafts). A machine stops crafting while its output buffer is full.
 - **Recipe visuals:** purely visual. An assembler can have a different representation depending on its recipe, e.g. a smelter for ore → plate recipes. No extra toolbar entry.
 - **Everything goes over belts**; no direct machine-to-machine transfer.
 
@@ -46,15 +48,13 @@
   - Together they reach two belts, so up to four lanes and four ingredients per machine.
 - **Rotation matters:** inserter points have to face the belts.
 - Inserters handle input and output. Output goes through one short inserter at a fixed point per shape and lands on the far lane of the adjacent belt, as in Factorio; there are no long outputs.
-- Inserters take only what the recipe needs, until the machine's small buffer is full. Inserter speed is a fixed rate and limits throughput.
+- Inserters take only what the recipe needs, until that ingredient's input buffer (2× its recipe amount) is full. Inserter speed is a fixed rate and limits throughput.
 - Belts passing several machines feed all of them, Factorio main-bus style.
 - Inserters are not separate machines → don't count toward the machine score.
 
 ## Transport
 
 - **Two-lane belts**, single belt type.
-- **Splitters:** split one belt into two belts, but items keep their lanes.
-- **Merging belts:** Factorio-style side-loading.
 - **Belt overpasses:** a crossing tile; both lanes pass through unchanged.
 - **No underground belts**
 - Items back up when a belt is blocked or ends.
@@ -77,7 +77,7 @@
 - The reference solution should be challenging but fair: good, but deliberately not optimal, so a skilled player can match or beat its time and machine targets.
 - The reference solution uses the same parts the player has: the fixed shape sequence, built-in inserters, belts, splitters, overpasses.
 - The reference solution always uses one item type per belt lane.
-- The reference solution's target values are measured by running it once through the game's simulation.
+- The reference solution's target values (time, machine count, belt tile count) are measured by running it once through the game's simulation and counting its layout.
 
 ## Runs
 
@@ -117,9 +117,11 @@
 
 - **Time:** the loop start (see "Run evaluation"), shown in seconds, not as raw ticks.
 - **Machines:** machine count compared with the generator's reference solution. Fewer than the reference earns bonus points, more costs points.
+- **Belts:** belt tile count compared with the reference layout. Fewer than the reference earns bonus points, more costs points. Rewards compact layouts, since the minimum machine count mostly follows from recipe ratios.
 - **Shown to the player:**
   - The goal: target item and rate.
   - Machine count compared with the target.
+  - Belt tile count compared with the target.
   - Time of the last run compared with the target.
   - The run controls.
 
@@ -148,7 +150,7 @@
   - Rendering ← reads layout and run state
   - Saving ↔ layout and progress
 - **Build phase:** the player edits the generator-provided layout.
-- **Layout compilation:** when Run is pressed, the layout is compiled into a network: a list of belt lanes, what each lane feeds into, how merges resolve, and which lanes each machine's inserters read and write. The simulation never looks at the grid; it only steps the compiled network.
+- **Layout compilation:** when Run is pressed, the layout is compiled into a network: a list of belt lanes, what each lane feeds into, and which lanes each machine's inserters read and write. The simulation never looks at the grid; it only steps the compiled network.
 - **Two kinds of state:**
   - **Layout** (the grid the player edits: tiles, buildings, rotations, belts): written by the generator, build mode and loading a save.
   - **Run state** (items, buffers, timers): written only by the simulation. Each run creates a fresh one; stopping discards it.
@@ -161,7 +163,7 @@
 | --- | --- |
 | Aegeontis | Level generator, reference solution, tutorial seed |
 | Zuebot | Tick simulation on the compiled network, loop detection and cutoff, rate measurement, scoring |
-| Cudoras | Building rules (placement, collision, rotation, inserter points), layout → network compilation, belt merging rules, undo/redo, saving |
+| Cudoras | Building rules (placement, collision, rotation, inserter points), layout → network compilation, undo/redo, saving |
 | Drill8888 | Framework choice, rendering incl. interpolation, input handling, camera, placement preview, recipe menu, tooltips, game flow (menus, level progression, build/run/result states), end-to-end tests |
 
 ## Scope increasers (if time allows)
@@ -171,6 +173,9 @@
   - Generated or per-level assembler shape sequences, with generated input and output points
   - Sliding difficulty that rises from level to level, up to infinite levels
   - Underground belts
+  - Belt merging via Factorio-style side-loading (belt topology, lane assignment, priority between straight and side input)
+  - Splitter filtering
+  - Point deduction for wrong items at the delivery point
 - **Separate game modes:**
   - **Limited resources:** ore runs out, so the goal is making the most of a fixed supply
   - **Spoilage:** some items have a short lifespan, so routes and buffers must be short; expired items turn into spoilage, which must be removed
@@ -182,17 +187,6 @@
 - **Platforms:**
   - Web build (WASM), mobile builds
 
-## Questions for the team
+## Open questions
 
-1. **\[Transport\] Merging belts:** Factorio-style side-loading or a dedicated merger building? For grading, side-loading is the more interesting code (belt topology, lane assignment, priority between straight and side input). A merger is simpler: one more building with an alternate-inputs rule, but whose turn it is then has to be tracked in the state hash.
-2. **\[Map\] Delivery point and wrong items**, three options:
-   1. Accept any item; only target items count.
-   2. Accept any item, but deduct points for wrong ones.
-   3. Accept only target items; a wrong item blocks the belt (which fails the run).
-3. **\[Run evaluation\] Win/target rate:** fixed per difficulty, or derived from the generated reference solution? Derived is easier for the generator: the reference solution is simulated anyway, so its rate is always reachable. Fixed is harder: the generator must guarantee a solution that hits the rate on a cramped map.
-4. **\[Buildings\] Mirroring assemblers:** can the player mirror shapes, or only rotate them? Mirroring only adds new shapes for asymmetric pieces like L or S (a mirrored T is still a T); without it, the fixed shape sequence matters more.
-5. **\[Transport\] Splitter filtering:** should splitters be able to filter items from the start?
-6. **\[Scoring\]** **Add belt tiles used as a third score?** The minimum machine count mostly follows from recipe ratios, so it rarely rewards a better layout. Compared against the reference layout?
-7. **\[Playthrough\] Level progression:** does a level have to be won before the next one unlocks, or can the player skip ahead?
-8. **\[Playthrough\] Saved scores:** are the best time and machine count saved per level, or only the last run?
-9. **\[Buildings\] Buffer sizes:** a fixed number of items for every machine, or a multiple of the recipe's amounts (e.g. enough for two crafts, as in Factorio)? Bigger buffers smooth throughput but delay the loop start.
+1. **\[Run evaluation\] Win/target rate (postponed):** fixed per difficulty, or derived from the generated reference solution? Derived is easier for the generator: the reference solution is simulated anyway, so its rate is always reachable. Fixed is harder: the generator must guarantee a solution that hits the rate on a cramped map.
