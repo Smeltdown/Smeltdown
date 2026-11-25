@@ -34,7 +34,7 @@ pub struct Map {
 }
 
 impl Map {
-    /// Fails if a tile is out of bounds or two tiles share a position.
+    /// Fails if a tile is out of bounds, two tiles share a position or there is no delivery tile.
     pub fn new(
         seed: String,
         difficulty: Difficulty,
@@ -50,6 +50,9 @@ impl Map {
             if !seen.insert(t.pos) {
                 return Err(format!("{:?} is covered twice", t.pos));
             }
+        }
+        if !tiles.iter().any(|t| t.kind == TileKind::DeliveryPoint) {
+            return Err("no delivery tile".to_string());
         }
         Ok(Self { seed, difficulty, width, height, tiles })
     }
