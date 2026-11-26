@@ -37,12 +37,17 @@ pub id: u32
 }
 */
 
+#[derive (Debug, Clone)]
+pub struct OrePatch {
+    position: Position,
+    ore: Items,
+}
 
 #[derive (Debug, Clone)]
 pub struct MinerConfig {
     position: Position,
     direction: Direction,
-    produces: Items,
+    produce: Items,
     production_interval: u32,
 }
 
@@ -68,7 +73,8 @@ pub struct Layout {
     pub height: u32,
     pub miners: Vec<MinerConfig>,
     pub belts: Vec<BeltConfig>,
-    pub delivery_point: Vec<DeliveryPointConfig>
+    pub delivery_point: Vec<DeliveryPointConfig>,
+    pub ore_patch: Vec<OrePatch>,
 }
 
 pub enum Target {
@@ -86,7 +92,7 @@ impl Layout {
     }
     pub fn next_to_belt(&self, belt_idx: usize) -> Target {
         let belt = &self.belts[belt_idx];
-        let next_position = match belt.direction {
+        let next_position = match &belt.direction {
             Direction::North => Position { x: belt.position.x, y: belt.position.y - 1 },
             Direction::East => Position { x: belt.position.x + 1, y: belt.position.y },
             Direction::South => Position { x: belt.position.x, y: belt.position.y + 1 },
@@ -100,9 +106,18 @@ impl Layout {
             Target::None
         }
     }
+    pub fn miner_produces(&self,miner_idx: usize) -> Option<Items> {
+        let miner = &self.miners[miner_idx];
+
+        self.ore_patch
+            .iter()
+            .find(|patch| patch.position == miner.position)
+            .map(|patch| patch.ore)
+        
+    }
     pub fn output_of_miner(&self, miner_idx: usize) -> Target {
         let miner = &self.miners[miner_idx];
-        let next_position = match miner.direction {
+        let next_position = match &miner.direction {   
             Direction::North => Position { x: miner.position.x, y: miner.position.y - 1 },
             Direction::East => Position { x: miner.position.x + 1, y: miner.position.y },
             Direction::South => Position { x: miner.position.x, y: miner.position.y + 1 },
