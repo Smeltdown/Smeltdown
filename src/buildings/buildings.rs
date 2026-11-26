@@ -1,16 +1,16 @@
 
-#[derive (Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Position {
-    pub x: i32,
-    pub y: i32
+    pub x: u16,
+    pub y: u16,
 }
 
-#[derive (Debug, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Direction {
     North,
     East,
     South,
-    West
+    West,
 }
 
 impl Direction {
